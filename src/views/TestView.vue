@@ -48,7 +48,7 @@
         :disabled="submitting"
         class="submit-btn"
       >
-        {{ submitting ? '분석 중...' : '채점하기' }}
+        {{ submitting ? 'AI 분석 중...' : '채점하기' }}
       </button>
     </div>
 
@@ -64,7 +64,6 @@ import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { supabase } from '@/lib/supabase'
-import Anthropic from '@anthropic-ai/sdk'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -319,11 +318,6 @@ const submit = async () => {
 
 const analyzeWithClaude = async (score, wrongQuestions, categoryStats) => {
   try {
-    const anthropic = new Anthropic({
-      apiKey: import.meta.env.VITE_ANTHROPIC_API_KEY,
-      dangerouslyAllowBrowser: true
-    })
-
     const categoryAnalysis = Object.entries(categoryStats)
       .map(([cat, stats]) => {
         const percent = Math.round((stats.correct / stats.total) * 100)
@@ -357,13 +351,14 @@ ${wrongQuestions.map(q => `
 친근하고 격려하는 톤으로 작성해주세요.
 `
 
-    const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: prompt }]
+    // Edge Function 호출
+    const { data, error } = await supabase.functions.invoke('claude-chat', {
+      body: { message: prompt }
     })
 
-    return message.content[0].text
+    if (error) throw error
+
+    return data.content[0].text
   } catch (error) {
     console.error('AI 분석 실패:', error)
     
@@ -609,9 +604,5 @@ ${wrongQuestions.map(q => `
   .nav-btn, .submit-btn {
     width: 100%;
   }
-  
 }
-
-
-
 </style>
