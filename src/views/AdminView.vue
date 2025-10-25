@@ -2,7 +2,12 @@
   <div class="admin-container">
     <div class="header">
       <h1>📊 관리자 페이지</h1>
-      <a href="/" class="back-link">← 돌아가기</a>
+      <div class="header-actions">
+        <button @click="deleteAll" class="delete-all-btn" v-if="results.length > 0">
+          🗑️ 전체 삭제
+        </button>
+        <a href="/" class="back-link">← 돌아가기</a>
+      </div>
     </div>
 
     <div class="stats-grid">
@@ -35,6 +40,7 @@
             <th>점수</th>
             <th>제출 시간</th>
             <th>AI 분석</th>
+            <th>관리</th>
           </tr>
         </thead>
         <tbody>
@@ -50,6 +56,11 @@
             <td class="analysis">
               <button @click="showAnalysis(result)" class="view-btn">
                 보기
+              </button>
+            </td>
+            <td class="actions">
+              <button @click="deleteResult(result)" class="delete-btn">
+                🗑️ 삭제
               </button>
             </td>
           </tr>
@@ -98,6 +109,12 @@ const minScore = computed(() => {
 })
 
 onMounted(async () => {
+  await loadResults()
+})
+
+const loadResults = async () => {
+  loading.value = true
+  
   const { data } = await supabase
     .from('test_results')
     .select(`
@@ -112,7 +129,7 @@ onMounted(async () => {
   }))
   
   loading.value = false
-})
+}
 
 const formatDate = (date) => {
   return new Date(date).toLocaleString('ko-KR', {
@@ -138,6 +155,99 @@ const showAnalysis = (result) => {
 const closeModal = () => {
   selectedResult.value = null
 }
+
+const deleteResult = async (result) => {
+  const confirmMessage = `${result.student_name}님의 결과를 삭제하시겠습니까?\n\n학생 정보도 함께 삭제됩니다.`
+  
+  if (!confirm(confirmMessage)) {
+    return
+  }
+
+  try {
+    // 1. test_progress 삭제 (있다면)
+    await supabase
+      .from('test_progress')
+      .delete()
+      .eq('student_id', result.student_id)
+
+    // 2. test_results 삭제
+    const { error: resultError } = await supabase
+      .from('test_results')
+      .delete()
+      .eq('id', result.id)
+
+    if (resultError) throw resultError
+
+    // 3. students 삭제
+    const { error: studentError } = await supabase
+      .from('students')
+      .delete()
+      .eq('id', result.student_id)
+
+    if (studentError) throw studentError
+
+    // 4. 목록에서 제거
+    results.value = results.value.filter(r => r.id !== result.id)
+    
+    alert('✅ 삭제되었습니다.')
+  } catch (error) {
+    console.error('삭제 실패:', error)
+    alert('❌ 삭제 중 오류가 발생했습니다: ' + error.message)
+  }
+}
+
+const deleteAll = async () => {
+  const confirmMessage = `⚠️ 경고: 모든 데이터를 삭제하시겠습니까?\n\n- 총 ${results.value.length}명의 결과\n- 모든 학생 정보\n- 모든 진행 상황\n\n이 작업은 되돌릴 수 없습니다!`
+  
+  if (!confirm(confirmMessage)) {
+    return
+  }
+
+  // 한 번 더 확인
+  const doubleCheck = prompt('정말 삭제하려면 "삭제"를 입력하세요:')
+  if (doubleCheck !== '삭제') {
+    alert('취소되었습니다.')
+    return
+  }
+
+  try {
+    loading.value = true
+
+    // 1. test_progress 전체 삭제
+    const { error: progressError } = await supabase
+      .from('test_progress')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000') // 모든 행 삭제
+
+    if (progressError) throw progressError
+
+    // 2. test_results 전체 삭제
+    const { error: resultsError } = await supabase
+      .from('test_results')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+
+    if (resultsError) throw resultsError
+
+    // 3. students 전체 삭제
+    const { error: studentsError } = await supabase
+      .from('students')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+
+    if (studentsError) throw studentsError
+
+    // 4. 목록 비우기
+    results.value = []
+    
+    alert('✅ 모든 데이터가 삭제되었습니다.')
+  } catch (error) {
+    console.error('전체 삭제 실패:', error)
+    alert('❌ 삭제 중 오류가 발생했습니다: ' + error.message)
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -154,6 +264,12 @@ const closeModal = () => {
   margin-bottom: 40px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
 h1 {
   margin: 0;
   color: #333;
@@ -163,6 +279,31 @@ h1 {
   color: #667eea;
   text-decoration: none;
   font-size: 18px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+
+.back-link:hover {
+  background: #f0f4ff;
+}
+
+.delete-all-btn {
+  padding: 10px 20px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.3s;
+}
+
+.delete-all-btn:hover {
+  background: #c82333;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
 }
 
 .stats-grid {
@@ -290,6 +431,24 @@ tr:hover {
   transform: translateY(-2px);
 }
 
+.delete-btn {
+  padding: 8px 15px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s;
+  font-size: 14px;
+}
+
+.delete-btn:hover {
+  background: #cc0000;
+  transform: translateY(-2px);
+  box-shadow: 0 3px 10px rgba(255, 68, 68, 0.3);
+}
+
 /* 모달 */
 .modal {
   position: fixed;
@@ -352,5 +511,43 @@ tr:hover {
   background: #f8f9fa;
   padding: 20px;
   border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: flex-start;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-value {
+    font-size: 36px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  table {
+    font-size: 14px;
+  }
+
+  th, td {
+    padding: 12px 8px;
+  }
+
+  .delete-all-btn {
+    font-size: 14px;
+    padding: 8px 15px;
+  }
 }
 </style>
