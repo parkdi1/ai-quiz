@@ -1,37 +1,18 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <!-- 제목 -->
       <h1>📘 고등학생 AI·디지털 역량 진단 평가</h1>
       
-      <!-- 안내 문구 -->
       <div class="info-section">
-        <h3>검사 목적 및 안내</h3>
-        <p class="description">
-          본 검사는 고등학생을 대상으로 인공지능(AI) 역량과 디지털 역량을 진단하기 위해 설계되었습니다. 
-          문항은 객관식 4지선다형이며, 전체 예상 소요 시간은 약 <strong>30분</strong>입니다.
+        <p class="main-info">
+          본 검사는 고등학생을 대상으로 <strong>인공지능(AI) 역량</strong>과 
+          <strong>디지털 역량</strong>을 진단하기 위해 설계되었습니다.
         </p>
-        
-        <div class="competency-info">
-          <div class="competency-item">
-            <div class="competency-icon">🤖</div>
-            <div class="competency-text">
-              <strong>AI 역량</strong>
-              <p>인공지능 기술의 개념과 활용, 윤리적 고려사항을 이해하고 비판적으로 평가하는 능력</p>
-            </div>
-          </div>
-          
-          <div class="competency-item">
-            <div class="competency-icon">💻</div>
-            <div class="competency-text">
-              <strong>디지털 역량</strong>
-              <p>디지털 기술을 안전하고 효율적으로 사용하며, 정보 탐색·소통·콘텐츠 제작·문제 해결을 수행하는 능력</p>
-            </div>
-          </div>
-        </div>
+        <p class="sub-info">
+          📝 객관식 4지선다형 · ⏱️ 소요 시간 약 30분
+        </p>
       </div>
 
-      <!-- 로그인 폼 -->
       <form @submit.prevent="handleLogin" class="login-form">
         <p class="form-label">이름을 입력하고 시작하세요</p>
         <input
@@ -41,9 +22,10 @@
           required
           autofocus
         />
-        <button type="submit" :disabled="!name.trim()">
-          테스트 시작
+        <button type="submit" :disabled="!name.trim() || loading">
+          {{ loading ? '로그인 중...' : '테스트 시작' }}
         </button>
+        <p v-if="error" class="error">{{ error }}</p>
       </form>
     </div>
   </div>
@@ -57,10 +39,22 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 const name = ref('')
+const loading = ref(false)
+const error = ref('')
 
 const handleLogin = async () => {
-  await authStore.login(name.value)
-  router.push('/test')
+  loading.value = true
+  error.value = ''
+  
+  try {
+    await authStore.login(name.value)
+    router.push('/test')
+  } catch (err) {
+    error.value = '로그인 중 오류가 발생했습니다.'
+    console.error(err)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -79,86 +73,44 @@ const handleLogin = async () => {
   padding: 40px;
   border-radius: 20px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  max-width: 700px;
+  max-width: 500px;
   width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
 }
 
 h1 {
-  margin: 0 0 25px;
+  margin: 0 0 20px;
   color: #333;
-  font-size: 26px;
+  font-size: 24px;
   text-align: center;
   line-height: 1.4;
 }
 
-/* 안내 섹션 */
 .info-section {
-  background: #f8f9fa;
-  padding: 25px;
-  border-radius: 15px;
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  padding: 20px;
+  border-radius: 12px;
   margin-bottom: 30px;
-}
-
-.info-section h3 {
-  margin: 0 0 15px;
-  color: #667eea;
-  font-size: 18px;
-}
-
-.description {
-  color: #555;
-  line-height: 1.8;
-  margin-bottom: 20px;
-  font-size: 15px;
-}
-
-.description strong {
-  color: #667eea;
-  font-weight: 700;
-}
-
-/* 역량 설명 */
-.competency-info {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.competency-item {
-  display: flex;
-  gap: 15px;
-  padding: 15px;
-  background: white;
-  border-radius: 10px;
   border-left: 4px solid #667eea;
 }
 
-.competency-icon {
-  font-size: 32px;
-  flex-shrink: 0;
-}
-
-.competency-text {
-  flex: 1;
-}
-
-.competency-text strong {
-  display: block;
+.main-info {
   color: #333;
-  font-size: 16px;
-  margin-bottom: 5px;
+  line-height: 1.7;
+  margin: 0 0 10px;
+  font-size: 15px;
 }
 
-.competency-text p {
+.main-info strong {
+  color: #667eea;
+}
+
+.sub-info {
   color: #666;
   font-size: 14px;
-  line-height: 1.6;
   margin: 0;
+  text-align: center;
 }
 
-/* 로그인 폼 */
 .login-form {
   text-align: center;
 }
@@ -176,7 +128,7 @@ input {
   font-size: 18px;
   border: 2px solid #ddd;
   border-radius: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
   transition: border 0.3s;
 }
 
@@ -209,27 +161,9 @@ button:disabled {
   cursor: not-allowed;
 }
 
-/* 반응형 */
-@media (max-width: 768px) {
-  .login-box {
-    padding: 30px 20px;
-  }
-  
-  h1 {
-    font-size: 22px;
-  }
-  
-  .info-section {
-    padding: 20px;
-  }
-  
-  .competency-item {
-    flex-direction: column;
-    text-align: center;
-  }
-  
-  .competency-icon {
-    font-size: 40px;
-  }
+.error {
+  color: #ff6b6b;
+  margin-top: 10px;
+  font-size: 14px;
 }
 </style>
